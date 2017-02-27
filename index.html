@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<head>
+	<link rel="stylesheet" type="text/css" href="style.css">        
+	<script src="D3/d3.v3.js"></script>
+	<script src="http://labratrevenge.com/d3-tip/javascripts/d3.tip.v0.6.3.js"></script>
+	<script src="barGraph.js"></script>
+    <script src="pieChart.js"></script>
+    <script src="ForceDirected.js"></script>
+	
+</head>
+
+<body>
+   
+    <div id="dropDown" class="styled-select teal semi-square" style="margin-top:40px"></div>
+    <button type = "button" id="force" onclick="forceDirectedHelper()" >Force Directed</button>
+    <div id = "rangeDiv">
+        <input type="range" id="sliderBar" onchange="binUpdate(this.value)">
+    </div>
+    
+  
+    <p id = "PText" align="center">Slide left to reduce bin size and right to increase bin size</p>
+	<div id = "chart" style="height:500px; width:60%; clear:both;"></div>
+
+<script>
+    var selected = 1;
+    var binSize = 5;
+    
+	var margin = { top: 80, right: 20, bottom: 30, left: 50 },
+		width = 500  ,
+		height = 500 - margin.top - margin.bottom,
+		radius = Math.min(width, height) / 2;
+	var x = d3.scale.ordinal()
+		.rangeRoundBands([0, width + 10], .2);
+
+	var y = d3.scale.linear()
+		.range([height, 0]);
+
+	var xAxis = d3.svg.axis()
+		.scale(x)
+		.orient("bottom");
+
+	var yAxis = d3.svg.axis()
+		.scale(y)
+		.orient("left")
+    
+	var tip = d3.tip()
+		.attr('class', 'd3-tip')
+		.offset([-10, 0])
+		.html(function(d) {
+			return "<strong>Count :</strong> <span style='color:white'>" + d + "</span>";
+	})
+
+    function type(d) {
+	   d.height = +d.height;
+	   return d;
+    }
+    
+    var widthBin;
+    var array_data = [];
+    var bin_array;
+    var bins = [];
+    
+    
+    d3.select("#sliderBar")
+    .attr("step", "1")
+    .attr("max", binSize * 2)
+    .attr("min", 1)
+    .attr("value", binSize);
+    
+    
+	d3.csv("baseball_data.csv", type, function(error, data) {
+		var elements = Object.keys(data[0])
+			.filter(function(d) {
+                    return (d != "name");
+        });
+        
+        data.forEach(function(d) {
+            array_data.push((+d.height));   
+        })
+      
+        binCalculate();
+        x.domain(data.map(function(d, i){return bins[i];}));
+        
+		var selector = d3.select("#dropDown")
+		.append("select")
+		.attr("id","menu")
+		.on("change", function(d){
+            array_data = [];
+                 data.forEach(function(d) {
+                    array_data.push((+d[document.getElementById("menu").value]));
+            })
+            binCalculate();
+            x.domain(data.map(function(d, i){return bins[i];}));
+            
+            if (selected == 1){
+                 d3.select("svg").remove();
+                 createBarChart(bin_array);
+            }
+            else if(selected == 0) {
+                 d3.select("svg").remove();
+			     createPieChart(bin_array);
+            }
+		});                  
+  
+		selector.selectAll("option")
+		.data(elements)
+		.enter().append("option")
+		.attr("value", function(d){
+			return d;
+		})
+		.text(function(d){
+			return d;
+		}) 
+        
+		createBarChart(bin_array);
+	});
+
+    function binCalculate() {
+        widthBin = (d3.max(array_data) - d3.min(array_data))/binSize;
+        
+        bin_array = new Uint16Array(binSize);
+       
+        for (i = 0; i < binSize; i++) {
+            var start = ((d3.min(array_data) + i * widthBin));
+            bins[i] = start;
+        }
+     
+        array_data.forEach(function(d){
+            bin_array[Math.floor((d - d3.min(array_data))/widthBin)]++;
+        })
+        
+        y.domain([0, d3.max(bin_array)]);
+    }
+   
+    function getData() {
+        return bin_array;
+    }
+    
+    function forceDirectedHelper() {
+        if (selected != 2) {
+            d3.select("#sliderBar").remove();
+            d3.select("#rangeDiv")
+            .append("input")
+            .attr("type","range")
+            .attr("id","sliderBar")
+            .attr("onclick","binUpdate(this.value)")
+            .attr("step", "10")
+            .attr("max", "200")
+            .attr("min", "0")
+            .attr("value", 100);
+        }
+        var val = (document.getElementById("sliderBar").value);
+        if (val < 100)
+            val = 100;
+        forceDirected(val);
+    }
+    
+    function binUpdate(data) {
+        if (selected == 1 || selected == 0) {
+            binSize = data;
+            binCalculate();
+            if (selected == 1){
+                d3.select("svg").remove();
+                createBarChart(bin_array);
+            }
+            else {
+                d3.select("svg").remove();
+			 createPieChart(bin_array);
+            }
+        }
+        else {
+            selected = 1;
+            forceDirected(data);
+        }
+    }
+      
+</script>
+</body>   
